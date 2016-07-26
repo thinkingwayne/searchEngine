@@ -79,14 +79,17 @@ class searchnet:
         return l1.keys()
 
     def setupnetwork(self, wordids, urlids):
+        # value lists
         self.wordids = wordids
         self.hiddenids = self.getallhiddenids(wordids, urlids)
         self.urlids = urlids
-
+        
+        # node output
         self.ai = [1.0] * len(self.wordids)
         self.ah = [1.0] * len(self.hiddenids)
         self.ao = [1.0] * len(self.urlids)
-
+        
+        # weights matrix
         self.wi = [[self.getstrength(wordid, hiddenid, 0)
                    for hiddenid in self.hiddenids]
                    for wordid in self.wordids]
@@ -105,12 +108,64 @@ class searchnet:
                 sum = sum + self.ai[i] * self.wi[i][j]
             self.ah[j] = tanh(sum)
 
+        for k in range(len(self.urlids)):
+            sum = 0.0
+            for j in range(len(self.hiddenids)):
+                sum = sum + self.ah[j] * self.wo[j][k]
+            self.ao[k] = tanh(sum)
+
+        return self.ao[:]
+    
+    def dtanh(self, y):
+        return 1.0-y*y
+
+    def backPropagate(self, targets, N=0.5):
+        output_deltas = [0.0]*len(self.urlids)
+        for k in range(len(self.urlids)):
+            error = targets[k]-self.ao[k]
+            output_deltas[k] = self.dtanh(self.ao[k])*error
+
+        hidden_deltas = [0.0]*len(self.hiddenids)
+        for j in range(len(self.hiddenids)):
+            error = 0.0
             for k in range(len(self.urlids)):
-                sum = 0.0
-                for j in range(len(self.hiddenids)):
-                    sum = sum + self.ah[j] * self.wo[j][k]
-                self.ao[k] = tanh(sum)
-            return self.ao[:]
+                error = error + output_deltas[k]*self.wo[j][k]
+            hidden_deltas[j] = self.dtanh(self.ah[j])*error
+        
+        # update output weights
+        for j in range(len(self.hiddenids)):
+            for k in range(len(self.urlids)):
+                change = output_deltas[k]*self.ah[j]
+                self.wo[j][k] = self.wo[j][k] + N*change
+
+        # update input weights
+        for i in range(len(self.wordids)):
+            for j in range(len(self.hiddenids)):
+                change = hidden_deltas[j]*self.ai[i]
+                self.wi[i][j] = self.wi[i][j] + N*change
+
+
+    def trainquery(self, wordids, urlids, selectedurl):
+        self.generatehiddennode(wordids, urlids)
+        self.setupnetwork(wordids, urlids)
+
+        self.feedforward()
+        targets = [0.0]*len(urlids)
+        targets[urlids.index(selectedurl)] = 1.0
+        error = self.backPropagate(targets)
+        self.updatedatabase()
+
+    def updatedatabase(self):
+        for i in range(len(self.wordids)):
+            for j in range(len(self.hiddenids)):
+                self.setstrength(self.wordids[i], self.hiddenids[j],0,self.wi[i][j])
+
+        for j in range(len(self.hiddenids)):
+            for k in range(len(self.urlids)):
+                self.setstrength(self.hiddenids[j], self.urlids[k],1,self.wo[j][k])
+        self.con.commit()
+
+
 
 
     def getresult(self, wordids, urlids):
@@ -121,11 +176,13 @@ class searchnet:
 
 
 
+
 mynet = searchnet('nn.db')
 # 
 wWorld, wRiver, wBank = 101,102,103
-uworldBank, uRiver,uEarth = 201,202,203
-mynet.getresult([wWorld,wBank],[uworldBank, uRiver,uEarth])
+uWorldBank, uRiver,uEarth = 201,202,203
+mynet.trainquery([wWorld,wBank], [uWorldBank,uRiver,uEarth], uWorldBank)
+mynet.getresult([wWorld,wBank],[uWorldBank, uRiver,uEarth])
 # for c in mynet.con.execute('select * from wordhidden'):
 #     print c
 # for c in mynet.con.execute('select * from hiddenurl'):
