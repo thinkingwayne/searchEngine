@@ -181,7 +181,12 @@ mynet = searchnet('nn.db')
 # 
 wWorld, wRiver, wBank = 101,102,103
 uWorldBank, uRiver,uEarth = 201,202,203
-mynet.trainquery([wWorld,wBank], [uWorldBank,uRiver,uEarth], uWorldBank)
+# mynet.trainquery([wWorld,wBank], [uWorldBank,uRiver,uEarth], uWorldBank)
+allurls = [uWorldBank, uRiver, uEarth]
+for i in range(30):
+    mynet.trainquery([wWorld,wBank], allurls, uWorldBank)
+    mynet.trainquery([wRiver, wBank], allurls, uRiver)
+    mynet.trainquery([wWorld], allurls, uEarth)
 mynet.getresult([wWorld,wBank],[uWorldBank, uRiver,uEarth])
 # for c in mynet.con.execute('select * from wordhidden'):
 #     print c

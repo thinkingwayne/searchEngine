@@ -2,6 +2,9 @@ import urllib2
 from urlparse import urljoin
 from BeautifulSoup import *
 import sqlite3  as sqlite
+import nn
+
+mynet = nn.searchnet('nn.db')
 
 #  create a list of words to ignore
 ignorewords = set(['the', 'of', 'to', 'and', 'a', 'in','is' 'it'])
@@ -163,7 +166,7 @@ class searcher:
         totalscores = dict([(row[0],0) for row in rows])
         # This is where you'll later put the scoring functions
         weigths=[(1.5, self.locationscore(rows)),
-        (1.0,self.frequencyscore(rows))]
+                 (1.0, self.frequencyscore(rows))]
         for (weigth,scores) in weigths:
             for url in totalscores:
                 totalscores[url]+= weigth*scores[url]
@@ -178,6 +181,8 @@ class searcher:
         rankedscores = sorted([(score,url) for (url,score) in scores.items()],reverse =1)
         for (score,urlid) in rankedscores[0:10]:
             print '%f\t%s' % (score, self.geturlname(urlid))
+
+        return worids, [r[1] for r in rankedscores[0:10]]
     
     def normalizescores(self,scores,smallIsBetter = 0):
         vsmall = 0.00001
@@ -202,6 +207,12 @@ class searcher:
             if loc<locations[row[0]]:
                 locations[row[0]] = loc
         return self.normalizescores(locations,smallIsBetter=1)
+
+    def nnscore(self, rows, wordids):
+        urlids = [urlid for urlid in set([row[0] for row in rows])]
+        nnres = myset.getresult(wordids, urlids)
+        scores = dict([(urlids[i], nnres[i]) for i in range(len(urlids))])
+        return self.normalizescores(scores)
 # pagelist = ['http://kiwitobes.com']
 # crawler = crawler('searchindex.db')
 # crawler.createindextables()
@@ -210,6 +221,6 @@ class searcher:
 #     'select rowid from wordlocation where wordid = 3')]
 # print rows
 e=searcher('searchindex.db')
-print e.query('make little which')
+e.query('make little which')
 
 
